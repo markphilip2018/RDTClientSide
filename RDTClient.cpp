@@ -17,15 +17,15 @@ int main(int argc, char *argv[])
     struct addrinfo hints, *servinfo, *p;
     int rv;
     int numbytes;
-    if (argc != 3)
+   /* if (argc != 3)
     {
         fprintf(stderr,"usage: talker hostname message\n");
         exit(1);
-    }
+    }*/
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_DGRAM;
-    if ((rv = getaddrinfo(argv[1], SERVERPORT, &hints, &servinfo)) != 0)
+    if ((rv = getaddrinfo("127.0.0.1", SERVERPORT, &hints, &servinfo)) != 0)
     {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return 1;
@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "talker: failed to create socket\n");
         return 2;
     }
-    if ((numbytes = sendto(sockfd, argv[2], strlen(argv[2]), 0,
+    if ((numbytes = sendto(sockfd, "index.html", strlen(argv[2]), 0,
                            p->ai_addr, p->ai_addrlen)) == -1)
     {
         perror("talker: sendto");
@@ -59,9 +59,21 @@ int main(int argc, char *argv[])
         perror("recvfrom");
         exit(1);
     }
-    freeaddrinfo(servinfo);
+
     printf("talker: sent %d bytes to %s\n", numbytes, argv[1]);
     printf("talker: rec %s \n",buf);
+
+    struct packet *pack;
+    if ((numbytes = recvfrom(sockfd, pack, 1000, 0,
+                             p->ai_addr, &p->ai_addrlen)) == -1)
+    {
+        perror("recvfrom");
+        exit(1);
+    }
+
+    freeaddrinfo(servinfo);
+
+    printf("talker: rec22222 %s \n",pack);
     close(sockfd);
     return 0;
 }

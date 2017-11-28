@@ -9,19 +9,34 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include "packet_struct.h"
+#include <iostream>
+#include <fstream>
+
 #define SERVERPORT "4950" // the port users will be connecting to
 #define MAXBUFLEN 100
+
+using namespace std;
+
+void recive_file(string file_name)
+{
+
+    ofstream myfile;
+    myfile.open ("example.txt");
+    myfile << "Writing this to a file.\n";
+    myfile.close();
+
+}
 int main(int argc, char *argv[])
 {
     int sockfd;
     struct addrinfo hints, *servinfo, *p;
     int rv;
     int numbytes;
-   /* if (argc != 3)
-    {
-        fprintf(stderr,"usage: talker hostname message\n");
-        exit(1);
-    }*/
+    /* if (argc != 3)
+     {
+         fprintf(stderr,"usage: talker hostname message\n");
+         exit(1);
+     }*/
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_DGRAM;
@@ -63,8 +78,9 @@ int main(int argc, char *argv[])
     printf("talker: sent %d bytes to %s\n", numbytes, argv[1]);
     printf("talker: rec %s \n",buf);
 
-    struct packet *pack;
-    if ((numbytes = recvfrom(sockfd, pack, 1000, 0,
+   // while()
+        struct packet pack;
+    if ((numbytes = recvfrom(sockfd, (struct packet*)&pack, sizeof(pack), 0,
                              p->ai_addr, &p->ai_addrlen)) == -1)
     {
         perror("recvfrom");
@@ -73,7 +89,7 @@ int main(int argc, char *argv[])
 
     freeaddrinfo(servinfo);
 
-    printf("talker: rec22222 %s \n",pack);
+    printf("talker: rec22222 %s \n",pack.data);
     close(sockfd);
     return 0;
 }

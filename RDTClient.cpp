@@ -14,15 +14,51 @@
 
 #define SERVERPORT "4950" // the port users will be connecting to
 #define MAXBUFLEN 100
+#define PACKET_SIZE 500
 
 using namespace std;
 
-void recive_file(string file_name)
+void receive_file(string file_name, int sockfd,struct addrinfo *p)
 {
 
     ofstream myfile;
-    myfile.open ("example.txt");
-    myfile << "Writing this to a file.\n";
+
+    myfile.open (file_name);
+
+    int size = PACKET_SIZE;
+    int numbytes;
+
+    while(size == PACKET_SIZE)
+    {
+        struct packet pack;
+        if ((numbytes = recvfrom(sockfd, (struct packet*)&pack, sizeof(pack), 0,
+                                 p->ai_addr, &p->ai_addrlen)) == -1)
+        {
+            perror("recvfrom");
+            exit(1);
+        }
+
+        size = pack.len;
+
+        for(int i = 0 ; i < size ; i++)
+            myfile<<pack.data[i];
+
+
+        cout << "pack num : "<<pack.seqno<<" with length : "<<pack.len<<endl;
+
+        size = pack.len;
+
+        struct ack_packet acknowledgement;
+        acknowledgement.ackno = pack.seqno;
+
+        if ((numbytes = sendto(sockfd,(struct ack_packet*)&acknowledgement, sizeof(acknowledgement), 0,
+                               p->ai_addr, p->ai_addrlen)) == -1)
+        {
+            perror("talker: sendto");
+            exit(1);
+        }
+    }
+
     myfile.close();
 
 }
@@ -61,7 +97,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "talker: failed to create socket\n");
         return 2;
     }
-    if ((numbytes = sendto(sockfd, "index.html", strlen(argv[2]), 0,
+    if ((numbytes = sendto(sockfd, "mark2.jpeg", strlen(argv[2]), 0,
                            p->ai_addr, p->ai_addrlen)) == -1)
     {
         perror("talker: sendto");
@@ -78,18 +114,11 @@ int main(int argc, char *argv[])
     printf("talker: sent %d bytes to %s\n", numbytes, argv[1]);
     printf("talker: rec %s \n",buf);
 
-   // while()
-        struct packet pack;
-    if ((numbytes = recvfrom(sockfd, (struct packet*)&pack, sizeof(pack), 0,
-                             p->ai_addr, &p->ai_addrlen)) == -1)
-    {
-        perror("recvfrom");
-        exit(1);
-    }
+    receive_file("mark2.jpeg",sockfd,p);
 
     freeaddrinfo(servinfo);
 
-    printf("talker: rec22222 %s \n",pack.data);
+    //printf("talker: rec22222 %s \n",pack.data);
     close(sockfd);
     return 0;
 }

@@ -21,12 +21,23 @@ using namespace std;
 set<uint32_t> rec_packet_pool ;
 int seed = 5 ;
 
-bool probability_recieve(){
+/**
+    this function to calculate the probability of receiving an acknowledgment
+*/
+bool probability_recieve()
+{
     int p= (rand() % 100) + 1;
     cout<<"probability of receive "<<p<<endl;
     return p > seed ;
 }
-void receive_file(string file_name, int sockfd,struct addrinfo *p)
+
+/**
+    this function to receive a requested file by using send and wait approach
+    @param file_name the name of file will be received
+    @param sockfd the socket number of the server
+    @param *p the address information of the server
+*/
+void receive_file_send_and_wait(string file_name, int sockfd,struct addrinfo *p)
 {
 
     ofstream myfile;
@@ -39,13 +50,13 @@ void receive_file(string file_name, int sockfd,struct addrinfo *p)
     while(size == PACKET_SIZE)
     {
 
-            struct packet pack;
-            if ((numbytes = recvfrom(sockfd, (struct packet*)&pack, sizeof(pack), 0,
-                                     p->ai_addr, &p->ai_addrlen)) == -1)
-            {
-                perror("recvfrom");
-                exit(1);
-            }
+        struct packet pack;
+        if ((numbytes = recvfrom(sockfd, (struct packet*)&pack, sizeof(pack), 0,
+                                 p->ai_addr, &p->ai_addrlen)) == -1)
+        {
+            perror("recvfrom");
+            exit(1);
+        }
         if(!probability_recieve())
         {
             continue ;
@@ -84,6 +95,8 @@ void receive_file(string file_name, int sockfd,struct addrinfo *p)
     myfile.close();
 
 }
+
+
 int main(int argc, char *argv[])
 {
     int sockfd;
@@ -119,7 +132,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "talker: failed to create socket\n");
         return 2;
     }
-    if ((numbytes = sendto(sockfd, "simp.png", strlen(argv[2]), 0,
+    if ((numbytes = sendto(sockfd, "mark2.jpeg", strlen("mark2.jpeg"), 0,
                            p->ai_addr, p->ai_addrlen)) == -1)
     {
         perror("talker: sendto");
@@ -136,7 +149,7 @@ int main(int argc, char *argv[])
     printf("talker: sent %d bytes to %s\n", numbytes, argv[1]);
     printf("talker: rec %s \n",buf);
 
-    receive_file("simp.png",sockfd,p);
+    receive_file_send_and_wait("mark2.jpeg",sockfd,p);
 
     freeaddrinfo(servinfo);
 

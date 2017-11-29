@@ -11,13 +11,21 @@
 #include "packet_struct.h"
 #include <iostream>
 #include <fstream>
+#include <set>
 
 #define SERVERPORT "4950" // the port users will be connecting to
 #define MAXBUFLEN 100
 #define PACKET_SIZE 500
 
 using namespace std;
+set<uint32_t> rec_packet_pool ;
+int seed = 5 ;
 
+bool probability_recieve(){
+    int p= (rand() % 100) + 1;
+    cout<<"probability of receive "<<p<<endl;
+    return p > seed ;
+}
 void receive_file(string file_name, int sockfd,struct addrinfo *p)
 {
 
@@ -27,26 +35,40 @@ void receive_file(string file_name, int sockfd,struct addrinfo *p)
 
     int size = PACKET_SIZE;
     int numbytes;
-
+    bool first_time= true ;
     while(size == PACKET_SIZE)
     {
-        struct packet pack;
-        if ((numbytes = recvfrom(sockfd, (struct packet*)&pack, sizeof(pack), 0,
-                                 p->ai_addr, &p->ai_addrlen)) == -1)
+
+            struct packet pack;
+            if ((numbytes = recvfrom(sockfd, (struct packet*)&pack, sizeof(pack), 0,
+                                     p->ai_addr, &p->ai_addrlen)) == -1)
+            {
+                perror("recvfrom");
+                exit(1);
+            }
+        if(!probability_recieve())
         {
-            perror("recvfrom");
-            exit(1);
+            continue ;
+        }
+        size = pack.len;
+        const bool is_in = rec_packet_pool.find(pack.seqno) != rec_packet_pool.end();
+        if(!is_in)
+        {
+            for(int i = 0 ; i < size ; i++)
+                myfile<<pack.data[i];
+
+            rec_packet_pool.insert(pack.seqno);
+        }
+        else
+        {
+            cout<<"dup ack of packet"<<pack.seqno<<endl;
         }
 
-        size = pack.len;
 
-        for(int i = 0 ; i < size ; i++)
-            myfile<<pack.data[i];
 
 
         cout << "pack num : "<<pack.seqno<<" with length : "<<pack.len<<endl;
 
-        size = pack.len;
 
         struct ack_packet acknowledgement;
         acknowledgement.ackno = pack.seqno;
@@ -97,7 +119,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "talker: failed to create socket\n");
         return 2;
     }
-    if ((numbytes = sendto(sockfd, "mark2.jpeg", strlen(argv[2]), 0,
+    if ((numbytes = sendto(sockfd, "simp.png", strlen(argv[2]), 0,
                            p->ai_addr, p->ai_addrlen)) == -1)
     {
         perror("talker: sendto");
@@ -114,7 +136,7 @@ int main(int argc, char *argv[])
     printf("talker: sent %d bytes to %s\n", numbytes, argv[1]);
     printf("talker: rec %s \n",buf);
 
-    receive_file("mark2.jpeg",sockfd,p);
+    receive_file("simp.png",sockfd,p);
 
     freeaddrinfo(servinfo);
 

@@ -12,13 +12,15 @@
 #include <iostream>
 #include <fstream>
 #include <set>
-
+#include <map>
 #define SERVERPORT "4950" // the port users will be connecting to
 #define MAXBUFLEN 100
 #define PACKET_SIZE 500
 
 using namespace std;
 set<uint32_t> rec_packet_pool ;
+set<uint32_t> rec_selective_repeat ;
+map<uint32_t,packet> buffer ;
 int seed = 5 ;
 
 /**
@@ -97,6 +99,110 @@ void receive_file_send_and_wait(string file_name, int sockfd,struct addrinfo *p)
 }
 
 
+int white_file_selective_repeat(ofstream myfile,string file_name,int min)
+{
+
+
+    return min;
+}
+/**
+    this function to receive a requested file by using selective approach
+    @param file_name the name of file will be received
+    @param sockfd the socket number of the server
+    @param *p the address information of the server
+*/
+void receive_file_selective_repeat(string file_name, int sockfd,struct addrinfo *p)
+{
+    ofstream myfile;
+    myfile.open (file_name);
+
+    int min = 0;
+    int size = PACKET_SIZE;
+    int numbytes;
+    bool first_time= true ;
+
+    while(1)
+    {
+        first_time = false;
+        struct packet pack;
+
+        timeval timeout = { 10, 0 };
+
+        fd_set in_set;
+
+        FD_ZERO(&in_set);
+        FD_SET(sockfd, &in_set);
+
+        // select the set
+        int cnt = select(sockfd + 1, &in_set, NULL, NULL, &timeout);
+
+        if (FD_ISSET(sockfd, &in_set))
+        {
+            if ((numbytes = recvfrom(sockfd, (struct packet*)&pack, sizeof(pack), 0,
+                                     p->ai_addr, &p->ai_addrlen)) == -1)
+            {
+                perror("recvfrom");
+                exit(1);
+            }
+            if(!probability_recieve())
+            {
+                continue ;
+            }
+            size = pack.len;
+            const bool is_in = rec_packet_pool.find(pack.seqno) != rec_packet_pool.end();
+            if(!is_in)
+            {
+                rec_packet_pool.insert(pack.seqno);
+                rec_selective_repeat.insert(pack.seqno);
+                buffer.insert(std::pair<uint32_t,packet> (pack.seqno,pack));
+
+                // need to put in function
+
+            }
+            else
+            {
+                cout<<"dup ack of packet"<<pack.seqno<<endl;
+            }
+
+
+
+
+            cout << "pack num : "<<pack.seqno<<" with length : "<<pack.len<<endl;
+
+
+            struct ack_packet acknowledgement;
+            acknowledgement.ackno = pack.seqno;
+
+            if ((numbytes = sendto(sockfd,(struct ack_packet*)&acknowledgement, sizeof(acknowledgement), 0,
+                                   p->ai_addr, p->ai_addrlen)) == -1)
+            {
+                perror("talker: sendto");
+                exit(1);
+            }
+
+            while(1)
+            {
+                const bool found = rec_selective_repeat.find(min) != rec_selective_repeat.end();
+
+                if(found)
+                {
+                    struct packet pk = buffer[min++];
+                    cout<<"packNUm*************: "<<pk.seqno<<"min : "<<min-1<<endl;
+                    buffer.erase(pk.seqno);
+                    for(int i = 0 ; i < pk.len ; i++)
+                        myfile<<pk.data[i];
+                }
+                else
+                    break;
+            }
+        }else{
+            break;
+        }
+    }
+    myfile.close();
+
+}
+
 int main(int argc, char *argv[])
 {
     int sockfd;
@@ -132,7 +238,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "talker: failed to create socket\n");
         return 2;
     }
-    if ((numbytes = sendto(sockfd, "mark2.jpeg", strlen("mark2.jpeg"), 0,
+    if ((numbytes = sendto(sockfd, "simp.png", strlen("simp.png"), 0,
                            p->ai_addr, p->ai_addrlen)) == -1)
     {
         perror("talker: sendto");
@@ -149,7 +255,7 @@ int main(int argc, char *argv[])
     printf("talker: sent %d bytes to %s\n", numbytes, argv[1]);
     printf("talker: rec %s \n",buf);
 
-    receive_file_send_and_wait("mark2.jpeg",sockfd,p);
+    receive_file_selective_repeat("simp.png",sockfd,p);
 
     freeaddrinfo(servinfo);
 

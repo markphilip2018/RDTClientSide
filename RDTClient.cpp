@@ -21,7 +21,7 @@ using namespace std;
 set<uint32_t> rec_packet_pool ;
 set<uint32_t> rec_selective_repeat ;
 map<uint32_t,packet> buffer ;
-int seed = 5 ;
+int seed =1 ;
 
 /**
     this function to calculate the probability of receiving an acknowledgment
@@ -49,6 +49,7 @@ void receive_file_send_and_wait(string file_name, int sockfd,struct addrinfo *p)
     int size = PACKET_SIZE;
     int numbytes;
     bool first_time= true ;
+    time_t start  = time(NULL);
     while(size == PACKET_SIZE)
     {
 
@@ -92,9 +93,11 @@ void receive_file_send_and_wait(string file_name, int sockfd,struct addrinfo *p)
             perror("talker: sendto");
             exit(1);
         }
+        cout<< "Duration"<<time(NULL) - start <<endl;
     }
 
     myfile.close();
+    cout<< "Duration"<<time(NULL) - start <<endl;
 
 }
 
@@ -121,6 +124,7 @@ void receive_file_selective_repeat(string file_name, int sockfd,struct addrinfo 
     int numbytes;
     bool first_time= true ;
 
+    time_t start  = time(NULL);
     while(1)
     {
         first_time = false;
@@ -156,8 +160,6 @@ void receive_file_selective_repeat(string file_name, int sockfd,struct addrinfo 
                 rec_packet_pool.insert(pack.seqno);
                 rec_selective_repeat.insert(pack.seqno);
                 buffer.insert(std::pair<uint32_t,packet> (pack.seqno,pack));
-
-                // need to put in function
 
             }
             else
@@ -201,6 +203,7 @@ void receive_file_selective_repeat(string file_name, int sockfd,struct addrinfo 
         }
     }
     myfile.close();
+    cout<< "Duration"<<time(NULL) - start <<endl;
 
 }
 
@@ -255,7 +258,7 @@ int main(int argc, char *argv[])
 
     printf("talker: rec %s \n",buf);
 
-    receive_file_selective_repeat("mark2.jpeg",sockfd,p);
+    receive_file_send_and_wait("mark2.jpeg",sockfd,p);
 
     freeaddrinfo(servinfo);
 

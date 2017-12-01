@@ -126,7 +126,7 @@ void receive_file_selective_repeat(string file_name, int sockfd,struct addrinfo 
         first_time = false;
         struct packet pack;
 
-        timeval timeout = { 10, 0 };
+        timeval timeout = { 5, 0 };
 
         fd_set in_set;
 
@@ -144,6 +144,7 @@ void receive_file_selective_repeat(string file_name, int sockfd,struct addrinfo 
                 perror("recvfrom");
                 exit(1);
             }
+
             if(!probability_recieve())
             {
                 continue ;

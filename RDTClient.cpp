@@ -238,7 +238,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "talker: failed to create socket\n");
         return 2;
     }
-    if ((numbytes = sendto(sockfd, "simp.png", strlen("simp.png"), 0,
+    if ((numbytes = sendto(sockfd, "mark2.jpeg", strlen("mark2.jpeg"), 0,
                            p->ai_addr, p->ai_addrlen)) == -1)
     {
         perror("talker: sendto");
@@ -252,14 +252,12 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    printf("talker: sent %d bytes to %s\n", numbytes, argv[1]);
     printf("talker: rec %s \n",buf);
 
-    receive_file_selective_repeat("simp.png",sockfd,p);
+    receive_file_selective_repeat("mark2.jpeg",sockfd,p);
 
     freeaddrinfo(servinfo);
 
-    //printf("talker: rec22222 %s \n",pack.data);
     close(sockfd);
     return 0;
 }

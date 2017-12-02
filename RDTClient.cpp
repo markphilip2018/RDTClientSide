@@ -24,7 +24,7 @@ set<uint32_t> rec_selective_repeat ;
 map<uint32_t,packet> buffer ;
 char* LOCAL_IP ="127.0.0.1";
 char* FILE_NAME = "mark2.jpeg";
-int seed =1 ;
+int seed =5 ;
 
 /**
     this function to calculate the probability of receiving an acknowledgment
@@ -67,7 +67,19 @@ void receive_file_send_and_wait(string file_name, int sockfd,struct addrinfo *p)
         {
             continue ;
         }
+        uint16_t check_sum = 0;
         size = pack.len;
+        for(int i = 0 ; i < size ; i++)
+                check_sum+=pack.data[i];
+
+        check_sum += pack.cksum;
+        cout<< "checksum : "<<pack.cksum<<endl;
+        cout<<"-------------------------------------------------------: "<< check_sum<<endl;
+        if(check_sum != 65535){
+                cout<<"**************************************************: "<< check_sum<<endl;
+            continue;
+        }
+
         const bool is_in = rec_packet_pool.find(pack.seqno) != rec_packet_pool.end();
         if(!is_in)
         {

@@ -12,21 +12,36 @@
 #include <iostream>
 #include <fstream>
 #include <set>
-
+#include <map>
 #define SERVERPORT "4950" // the port users will be connecting to
 #define MAXBUFLEN 100
 #define PACKET_SIZE 500
 
 using namespace std;
 set<uint32_t> rec_packet_pool ;
-int seed = 5 ;
+set<uint32_t> rec_selective_repeat ;
+map<uint32_t,packet> buffer ;
+char* LOCAL_IP ="127.0.0.1";
+char* FILE_NAME = "mark2.jpeg";
+int seed =1 ;
 
-bool probability_recieve(){
+/**
+    this function to calculate the probability of receiving an acknowledgment
+*/
+bool probability_recieve()
+{
     int p= (rand() % 100) + 1;
     cout<<"probability of receive "<<p<<endl;
     return p > seed ;
 }
-void receive_file(string file_name, int sockfd,struct addrinfo *p)
+
+/**
+    this function to receive a requested file by using send and wait approach
+    @param file_name the name of file will be received
+    @param sockfd the socket number of the server
+    @param *p the address information of the server
+*/
+void receive_file_send_and_wait(string file_name, int sockfd,struct addrinfo *p)
 {
 
     ofstream myfile;
@@ -36,16 +51,17 @@ void receive_file(string file_name, int sockfd,struct addrinfo *p)
     int size = PACKET_SIZE;
     int numbytes;
     bool first_time= true ;
+    time_t start  = time(NULL);
     while(size == PACKET_SIZE)
     {
 
-            struct packet pack;
-            if ((numbytes = recvfrom(sockfd, (struct packet*)&pack, sizeof(pack), 0,
-                                     p->ai_addr, &p->ai_addrlen)) == -1)
-            {
-                perror("recvfrom");
-                exit(1);
-            }
+        struct packet pack;
+        if ((numbytes = recvfrom(sockfd, (struct packet*)&pack, sizeof(pack), 0,
+                                 p->ai_addr, &p->ai_addrlen)) == -1)
+        {
+            perror("recvfrom");
+            exit(1);
+        }
         if(!probability_recieve())
         {
             continue ;
@@ -79,26 +95,134 @@ void receive_file(string file_name, int sockfd,struct addrinfo *p)
             perror("talker: sendto");
             exit(1);
         }
+        cout<< "Duration"<<time(NULL) - start <<endl;
     }
 
     myfile.close();
+    cout<< "Duration"<<time(NULL) - start <<endl;
 
 }
+
+
+int white_file_selective_repeat(ofstream myfile,string file_name,int min)
+{
+
+
+    return min;
+}
+/**
+    this function to receive a requested file by using selective approach
+    @param file_name the name of file will be received
+    @param sockfd the socket number of the server
+    @param *p the address information of the server
+*/
+void receive_file_selective_repeat(string file_name, int sockfd,struct addrinfo *p)
+{
+    ofstream myfile;
+    myfile.open (file_name);
+
+    int min = 0;
+    int size = PACKET_SIZE;
+    int numbytes;
+    bool first_time= true ;
+
+    time_t start  = time(NULL);
+    while(1)
+    {
+        first_time = false;
+        struct packet pack;
+
+        timeval timeout = { 5, 0 };
+
+        fd_set in_set;
+
+        FD_ZERO(&in_set);
+        FD_SET(sockfd, &in_set);
+
+        // select the set
+        int cnt = select(sockfd + 1, &in_set, NULL, NULL, &timeout);
+
+        if (FD_ISSET(sockfd, &in_set))
+        {
+            if ((numbytes = recvfrom(sockfd, (struct packet*)&pack, sizeof(pack), 0,
+                                     p->ai_addr, &p->ai_addrlen)) == -1)
+            {
+                perror("recvfrom");
+                exit(1);
+            }
+
+            if(!probability_recieve())
+            {
+                continue ;
+            }
+            size = pack.len;
+            const bool is_in = rec_packet_pool.find(pack.seqno) != rec_packet_pool.end();
+            if(!is_in)
+            {
+                rec_packet_pool.insert(pack.seqno);
+                rec_selective_repeat.insert(pack.seqno);
+                buffer.insert(std::pair<uint32_t,packet> (pack.seqno,pack));
+
+            }
+            else
+            {
+                cout<<"dup ack of packet"<<pack.seqno<<endl;
+            }
+
+
+
+
+            cout << "pack num : "<<pack.seqno<<" with length : "<<pack.len<<endl;
+
+
+            struct ack_packet acknowledgement;
+            acknowledgement.ackno = pack.seqno;
+
+            if ((numbytes = sendto(sockfd,(struct ack_packet*)&acknowledgement, sizeof(acknowledgement), 0,
+                                   p->ai_addr, p->ai_addrlen)) == -1)
+            {
+                perror("talker: sendto");
+                exit(1);
+            }
+
+            while(1)
+            {
+                const bool found = rec_selective_repeat.find(min) != rec_selective_repeat.end();
+
+                if(found)
+                {
+                    struct packet pk = buffer[min++];
+                    cout<<"packNUm*************: "<<pk.seqno<<"min : "<<min-1<<endl;
+                    buffer.erase(pk.seqno);
+                    for(int i = 0 ; i < pk.len ; i++)
+                        myfile<<pk.data[i];
+                }
+                else
+                    break;
+            }
+        }else{
+            break;
+        }
+    }
+    myfile.close();
+    cout<< "Duration"<<time(NULL) - start <<endl;
+
+}
+
 int main(int argc, char *argv[])
 {
     int sockfd;
     struct addrinfo hints, *servinfo, *p;
     int rv;
     int numbytes;
-    /* if (argc != 3)
-     {
-         fprintf(stderr,"usage: talker hostname message\n");
-         exit(1);
-     }*/
+
+    if(argc>1)
+        FILE_NAME = argv[1];
+
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_DGRAM;
-    if ((rv = getaddrinfo("127.0.0.1", SERVERPORT, &hints, &servinfo)) != 0)
+    if ((rv = getaddrinfo(LOCAL_IP, SERVERPORT, &hints, &servinfo)) != 0)
     {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return 1;
@@ -119,7 +243,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "talker: failed to create socket\n");
         return 2;
     }
-    if ((numbytes = sendto(sockfd, "simp.png", strlen(argv[2]), 0,
+    if ((numbytes = sendto(sockfd, FILE_NAME, strlen(FILE_NAME), 0,
                            p->ai_addr, p->ai_addrlen)) == -1)
     {
         perror("talker: sendto");
@@ -133,14 +257,12 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    printf("talker: sent %d bytes to %s\n", numbytes, argv[1]);
     printf("talker: rec %s \n",buf);
 
-    receive_file("simp.png",sockfd,p);
+    receive_file_send_and_wait(FILE_NAME,sockfd,p);
 
     freeaddrinfo(servinfo);
 
-    //printf("talker: rec22222 %s \n",pack.data);
     close(sockfd);
     return 0;
 }

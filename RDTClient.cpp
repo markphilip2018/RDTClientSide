@@ -118,13 +118,6 @@ void receive_file_send_and_wait(string file_name, int sockfd,struct addrinfo *p)
 
 }
 
-
-int white_file_selective_repeat(ofstream myfile,string file_name,int min)
-{
-
-
-    return min;
-}
 /**
     this function to receive a requested file by using selective approach
     @param file_name the name of file will be received

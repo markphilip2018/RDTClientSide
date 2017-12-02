@@ -12,6 +12,7 @@
 #include <iostream>
 #include <fstream>
 #include <set>
+#include <sstream>
 #include <map>
 #define SERVERPORT "4950" // the port users will be connecting to
 #define MAXBUFLEN 100
@@ -200,7 +201,9 @@ void receive_file_selective_repeat(string file_name, int sockfd,struct addrinfo 
                 else
                     break;
             }
-        }else{
+        }
+        else
+        {
             break;
         }
     }
@@ -209,6 +212,107 @@ void receive_file_selective_repeat(string file_name, int sockfd,struct addrinfo 
 
 }
 
+//*******************************************************
+/**
+    this function to receive a requested file by using go back n approach
+    @param file_name the name of file will be received
+    @param sockfd the socket number of the server
+    @param *p the address information of the server
+*/
+void receive_file_go_back_n(string file_name, int sockfd,struct addrinfo *p)
+{
+    ofstream myfile;
+    myfile.open (file_name);
+
+    int min = 0;
+    int size = PACKET_SIZE;
+    int numbytes;
+    bool first_time= true ;
+
+    time_t start  = time(NULL);
+    while(1)
+    {
+        first_time = false;
+        struct packet pack;
+
+        timeval timeout = { 5, 0 };
+
+        fd_set in_set;
+
+        FD_ZERO(&in_set);
+        FD_SET(sockfd, &in_set);
+
+        // select the set
+        int cnt = select(sockfd + 1, &in_set, NULL, NULL, &timeout);
+
+        if (FD_ISSET(sockfd, &in_set))
+        {
+            if ((numbytes = recvfrom(sockfd, (struct packet*)&pack, sizeof(pack), 0,
+                                     p->ai_addr, &p->ai_addrlen)) == -1)
+            {
+                perror("recvfrom");
+                exit(1);
+            }
+
+            if(!probability_recieve())
+            {
+                continue ;
+            }
+            size = pack.len;
+            const bool is_in = rec_packet_pool.find(pack.seqno) != rec_packet_pool.end();
+            if(!is_in)
+            {
+                rec_packet_pool.insert(pack.seqno);
+                rec_selective_repeat.insert(pack.seqno);
+                buffer.insert(std::pair<uint32_t,packet> (pack.seqno,pack));
+
+            }
+            else
+            {
+                cout<<"dup ack of packet"<<pack.seqno<<endl;
+            }
+
+            while(1)
+            {
+                const bool found = rec_selective_repeat.find(min) != rec_selective_repeat.end();
+
+                if(found)
+                {
+                    struct packet pk = buffer[min++];
+                    cout<<"packNUm*************: "<<pk.seqno<<"min : "<<min-1<<endl;
+                    buffer.erase(pk.seqno);
+                    for(int i = 0 ; i < pk.len ; i++)
+                        myfile<<pk.data[i];
+                }
+                else
+                    break;
+            }
+
+
+            cout << "acknowledge num : "<<min-1<<endl;
+
+
+            struct ack_packet acknowledgement;
+            acknowledgement.ackno = min-1;
+
+            if ((numbytes = sendto(sockfd,(struct ack_packet*)&acknowledgement, sizeof(acknowledgement), 0,
+                                   p->ai_addr, p->ai_addrlen)) == -1)
+            {
+                perror("talker: sendto");
+                exit(1);
+            }
+
+
+        }
+        else
+        {
+            break;
+        }
+    }
+    myfile.close();
+    cout<< "Duration"<<time(NULL) - start <<endl;
+
+}
 int main(int argc, char *argv[])
 {
     int sockfd;
@@ -259,7 +363,22 @@ int main(int argc, char *argv[])
 
     printf("talker: rec %s \n",buf);
 
-    receive_file_send_and_wait(FILE_NAME,sockfd,p);
+    stringstream strValue;
+    strValue << argv[2];
+
+    unsigned int algo_type;
+    strValue >> algo_type;
+
+    if(algo_type == 1)
+    {
+        receive_file_send_and_wait(FILE_NAME,sockfd,p);
+    }
+    else if(algo_type == 2)
+    {
+        receive_file_selective_repeat(FILE_NAME,sockfd,p);
+    }
+    else
+        receive_file_go_back_n(FILE_NAME,sockfd,p);
 
     freeaddrinfo(servinfo);
 

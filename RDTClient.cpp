@@ -14,7 +14,6 @@
 #include <set>
 #include <sstream>
 #include <map>
-#define SERVERPORT "4950" // the port users will be connecting to
 #define MAXBUFLEN 100
 #define PACKET_SIZE 500
 
@@ -22,9 +21,12 @@ using namespace std;
 set<uint32_t> rec_packet_pool ;
 set<uint32_t> rec_selective_repeat ;
 map<uint32_t,packet> buffer ;
-char* LOCAL_IP ="127.0.0.1";
-char* FILE_NAME = "mark2.jpeg";
+
+string SERVER_PORT  = "4950";
+string SERVER_IP_ADDR ="127.0.0.1";
+string FILE_NAME = "simp.png";
 int seed =5 ;
+int algo_type = 1;
 
 /**
     this function to calculate the probability of receiving an acknowledgment
@@ -325,20 +327,66 @@ void receive_file_go_back_n(string file_name, int sockfd,struct addrinfo *p)
     cout<< "Duration"<<time(NULL) - start <<endl;
 
 }
-int main(int argc, char *argv[])
+
+void parse_args()
 {
+
+    int init_size;
+    string line;
+    ifstream infile("client.in");
+
+    //get IP address
+    getline(infile, line);
+    if(line.compare("null") != 0)
+       SERVER_IP_ADDR = line;
+
+    // get port number of server
+    getline(infile, line);
+    if(line.compare("null") != 0)
+       SERVER_PORT = line;
+
+    // get file name
+    getline(infile, line);
+    if(line.compare("null") != 0)
+        FILE_NAME = line ;
+
+    // get initial size
+    getline(infile, line);
+    if(line.compare("null") != 0)
+        init_size = atoi(line.c_str()) ;
+
+    // get probability seed
+    getline(infile, line);
+    if(line.compare("null") != 0)
+        seed = (int)(atof(line.c_str())*100);
+
+    // algo type
+    getline(infile, line);
+    if(line.compare("null") != 0)
+        algo_type = atoi(line.c_str());
+
+
+    cout<<"IP : "<<SERVER_IP_ADDR<<endl;
+    cout<<"PORT : "<<SERVER_PORT<<endl;
+    cout<<"FILE : "<<FILE_NAME<<endl;
+    cout<<"Init window size : "<<init_size<<endl;
+    cout<<"seed : "<<seed<<endl ;
+    cout<<"Algo : "<<algo_type<<endl ;
+
+}
+
+int main()
+{
+    parse_args();
     int sockfd;
     struct addrinfo hints, *servinfo, *p;
     int rv;
     int numbytes;
 
-    if(argc>1)
-        FILE_NAME = argv[1];
-
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_DGRAM;
-    if ((rv = getaddrinfo(LOCAL_IP, SERVERPORT, &hints, &servinfo)) != 0)
+    if ((rv = getaddrinfo(SERVER_IP_ADDR.c_str(), SERVER_PORT.c_str(), &hints, &servinfo)) != 0)
     {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return 1;
@@ -359,7 +407,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "talker: failed to create socket\n");
         return 2;
     }
-    if ((numbytes = sendto(sockfd, FILE_NAME, strlen(FILE_NAME), 0,
+    if ((numbytes = sendto(sockfd, FILE_NAME.c_str(), strlen(FILE_NAME.c_str()), 0,
                            p->ai_addr, p->ai_addrlen)) == -1)
     {
         perror("talker: sendto");
@@ -375,11 +423,7 @@ int main(int argc, char *argv[])
 
     printf("talker: rec %s \n",buf);
 
-    stringstream strValue;
-    strValue << argv[2];
 
-    unsigned int algo_type;
-    strValue >> algo_type;
 
     if(algo_type == 1)
     {
